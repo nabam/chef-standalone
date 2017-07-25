@@ -1,0 +1,13 @@
+[Unit]
+Description=Restore iptables firewall rules
+Before=network.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=sh -c "ipset restore < /etc/ipset.state"
+ExecStart=/sbin/iptables-restore /etc/iptables.rules
+ExecStart=/sbin/ip6tables-restore /etc/ip6tables.rules
+
+[Install]
+WantedBy=basic.target
