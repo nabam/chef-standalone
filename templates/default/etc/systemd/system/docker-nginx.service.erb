@@ -1,0 +1,31 @@
+#
+# Docker + Nginx systemd service
+#
+[Unit]
+Description=Nginx Docker Container
+After=network.target docker.socket
+Requires=docker.socket
+
+[Service]
+RestartSec=10
+Restart=always
+
+Environment="NAME=nginx"
+Environment="CONFIG_VOL=nginx-config"
+Environment="IMG=linuxserver/letsencrypt"
+Environment="SUBDOMAINS=<%= @subdomains %>"
+Environment="EMAIL=<%= @email %>"
+Environment="URL=<%= @url %>"
+
+# Clean-up bad state if still hanging around
+ExecStartPre=-/usr/bin/docker rm -f $NAME
+
+# Attempt to pull new image for security updates
+ExecStartPre=-/usr/bin/docker pull $IMG
+
+# Main process
+ExecStart=/usr/bin/docker run --rm --name=${NAME} -v ${CONFIG_VOL}:/config  -e EMAIL="${EMAIL}" -e URL="${URL}" \
+  -e SUBDOMAINS="${SUBDOMAINS}" -p 80:80 -p 443:443 -e TZ=<%= @timezone %> -e ONLY_SUBDOMAINS=true ${IMG}
+
+[Install]
+WantedBy=multi-user.target

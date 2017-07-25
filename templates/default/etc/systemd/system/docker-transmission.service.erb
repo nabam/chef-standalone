@@ -1,0 +1,31 @@
+#
+# Docker + Transmission systemd service
+#
+[Unit]
+Description=Transmission Docker Container
+After=network.target docker.socket
+Requires=docker.socket
+
+[Service]
+RestartSec=10
+Restart=always
+
+Environment="NAME=transmission"
+Environment="CONFIG_VOL=transmission-config"
+Environment="IMG=linuxserver/transmission"
+
+# Clean-up bad state if still hanging around
+ExecStartPre=-/usr/bin/docker rm -f $NAME
+
+# Attempt to pull new image for security updates
+ExecStartPre=-/usr/bin/docker pull $IMG
+
+# Main process
+ExecStart=/usr/bin/docker run --rm --name ${NAME} \
+  -v ${CONFIG_VOL}:/config -v /home/media/watch:/watch -v /home/media/downloads:/downloads \
+  -e TZ=<%= @timezone %> -e PGID=<%= @uid %> -e PUID=<%= @gid %> \
+  -p 172.17.0.1:9091:9091 -p 51413:51413 -p 51413:51413/udp \
+  ${IMG}
+
+[Install]
+WantedBy=multi-user.target
