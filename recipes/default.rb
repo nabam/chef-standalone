@@ -73,6 +73,15 @@ end
   docker_volume volume
 end
 
+# init openvpn
+script 'init openvpn' do
+  code <<-EOH
+    docker run -v ovpn-data-#{node['openvpn']['fqdn']}:/etc/openvpn --rm kylemanna/openvpn ovpn_genconfig -u #{node['openvpn']['fqdn']}"
+    docker run -v ovpn-data-#{node['openvpn']['fqdn']}:/etc/openvpn --rm -it kylemanna/openvpn ovpn_initpki
+  EOH
+  not_if { File.exist?("/var/lib/docker/volumes/ovpn-data-#{node['openvpn']['fqdn']}/_data/openvpn.conf") }
+end
+
 # systemd units for containers
 ['iptables-restore.service', 'docker-nginx.service', 'docker-openvpn@.service',
  'docker-plex.service', 'docker-transmission.service'].each do |unit|
@@ -93,9 +102,53 @@ end
 end
 
 # start containers
-['docker-nginx.service', "docker-openvpn@#{node['openvpn']['fqdn']}.service",
- 'docker-plex.service', 'docker-transmission.service'].each do |unit|
-  service unit do
+['docker-nginx', "docker-openvpn@#{node['openvpn']['fqdn']}",
+ 'docker-plex', 'docker-transmission'].each do |svc|
+  service svc do
     action [:enable, :start]
   end
+end
+
+# www configuration
+template '/var/lib/docker/volumes/nginx-config/_data/nginx/site-confs/default' do
+  source   'volumes/nginx-config/nginx/site-confs/default.erb'
+  notifies :restart, 'service[docker-nginx]'
+end
+
+git '/var/lib/docker/volumes/nginx-config/_data/www' do
+  repository 'https://github.com/nabam/nabam.github.io.git'
+  revision 'master'
+  action :export
+end
+
+directory '/var/lib/docker/volumes/nginx-config/_data/www/speedtest' do
+  recursive true
+end
+
+remote_file '/var/lib/docker/volumes/nginx-config/_data/www/speedtest/speedtest_worker.min.js' do
+  source 'https://raw.githubusercontent.com/adolfintel/speedtest/master/speedtest_worker.min.js'
+  action :create
+end
+
+template '/var/lib/docker/volumes/nginx-config/_data/www/speedtest/index.html' do
+  source   'volumes/nginx-config/www/speedtest/index.html.erb'
+end
+
+execute 'dd if=/dev/urandom of=/var/lib/docker/volumes/nginx-config/_data/www/speedtest/payload bs=1024 count=$((1024*50))' do
+  not_if { File.exist?('/var/lib/docker/volumes/nginx-config/_data/www/speedtest/payload') }
+end
+
+# transmission configuration
+template '/var/lib/docker/volumes/transmission-config/_data/settings.json' do
+  source   'volumes/transmission-config/settings.json.erb'
+  notifies :restart, 'service[docker-transmission]'
+end
+
+# openvpn configuration
+template "/var/lib/docker/volumes/ovpn-data-#{node['openvpn']['fqdn']}/_data/openvpn.conf" do
+  source   'volumes/ovpn-data/openvpn.conf.erb'
+  variables({
+    fqdn: node['openvpn']['fqdn']
+  })
+  notifies :restart, "service[docker-openvpn@#{node['openvpn']['fqdn']}]"
 end

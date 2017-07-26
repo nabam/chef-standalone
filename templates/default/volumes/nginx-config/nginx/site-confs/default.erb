@@ -1,0 +1,76 @@
+# listening on port 80 disabled by default, remove the "#" signs to enable
+# redirect all traffic to https
+server {
+  listen 80;
+  server_name _;
+  return 301 https://$host$request_uri;
+}
+
+# main server block
+
+upstream transmission  {
+  server 172.17.0.1:9091; #Transmission
+}
+
+server {
+  listen 443 ssl default_server http2;
+
+  root /config/www;
+  index index.html index.htm index.php;
+
+  server_name _;
+
+  ssl_certificate /config/keys/letsencrypt/fullchain.pem;
+  ssl_certificate_key /config/keys/letsencrypt/privkey.pem;
+  ssl_dhparam /config/nginx/dhparams.pem;
+  ssl_ciphers 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA';
+  ssl_prefer_server_ciphers on;
+
+  client_max_body_size 0;
+
+  location /transmission {
+    proxy_pass_header  X-Transmission-Session-Id;
+
+    auth_basic "Restricted";
+    auth_basic_user_file /config/nginx/.htpasswd;
+    include /config/nginx/proxy.conf;
+
+    proxy_pass   http://transmission;
+
+    rewrite        ^/transmission/?$ /transmission/web/ redirect;
+  }
+
+
+  location /ip {
+    return 200 $remote_addr\n;
+    add_header Content-Type text/plain;
+  }
+
+  location /speedtest/payload {
+    gzip off;
+
+    expires off;
+
+    add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0";
+    add_header Cache-Control "post-check=0, pre-check=0";
+    add_header Pragma "no-cache";
+  }
+
+  location /speedtest/empty {
+    return 200;
+
+    expires off;
+
+    add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0";
+    add_header Cache-Control "post-check=0, pre-check=0";
+    add_header Pragma "no-cache";
+  }
+
+
+  location ~ \.php$ {
+    fastcgi_split_path_info ^(.+\.php)(/.+)$;
+    fastcgi_pass 127.0.0.1:9000;
+    fastcgi_index index.php;
+    include /etc/nginx/fastcgi_params;
+  }
+}
