@@ -4,6 +4,8 @@
 #
 # Copyright:: 2017, The Authors, All Rights Reserved.
 
+apt_update
+
 # gandi config
 if File.exist?('/etc/default/gandi')
   template '/etc/default/gandi' do
@@ -15,10 +17,11 @@ end
 include_recipe 'systemd::timezone'
 
 # install software
-['ipset', 'docker.io', 'sysdig', 'sysdig-dkms', 'bash-completion',
- 'linux-headers-generic', 'git', 'apache2-utils', 'tcpdump',
- 'htop', 'transmission-remote-cli', 'tcpdump', 'dnsutils',
- 'silversearcher-ag', 'tree', 'file'].each do |pkg|
+['ipset', 'docker.io', 'sysdig', 'bash-completion', 'tcpdump',
+ 'linux-headers-generic', 'linux-image-generic', 'sysdig-dkms',
+ 'git', 'apache2-utils', 'htop', 'transmission-remote-cli',
+ 'tcpdump', 'dnsutils', 'vim', 'silversearcher-ag', 'tree',
+ 'file', 'haveged'].each do |pkg|
   package pkg
 end
 
@@ -31,7 +34,7 @@ end
 
 service 'iptables-restore' do
   action [:enable]
-  notifies :restart, 'service[docker]'
+  notifies :restart, 'service[docker]', :immediate
 end
 
 file '/etc/ipset.state'
@@ -60,6 +63,10 @@ template '/etc/ssh/sshd_config' do
 end
 
 # media
+group 'media' do
+  gid 1001
+end
+
 user 'media' do
   uid   1001
   gid   1001
@@ -71,15 +78,6 @@ end
 ['nginx-config', "ovpn-data-#{node['openvpn']['fqdn']}",
  'plex-config', 'plex-transcode', 'transmission-config'].each do |volume|
   docker_volume volume
-end
-
-# init openvpn
-script 'init openvpn' do
-  code <<-EOH
-    docker run -v ovpn-data-#{node['openvpn']['fqdn']}:/etc/openvpn --rm kylemanna/openvpn ovpn_genconfig -u #{node['openvpn']['fqdn']}"
-    docker run -v ovpn-data-#{node['openvpn']['fqdn']}:/etc/openvpn --rm -it kylemanna/openvpn ovpn_initpki
-  EOH
-  not_if { File.exist?("/var/lib/docker/volumes/ovpn-data-#{node['openvpn']['fqdn']}/_data/openvpn.conf") }
 end
 
 # systemd units for containers
@@ -101,18 +99,36 @@ end
   end
 end
 
-# start containers
-['docker-nginx', "docker-openvpn@#{node['openvpn']['fqdn']}",
- 'docker-plex', 'docker-transmission'].each do |svc|
-  service svc do
-    action [:enable, :start]
-  end
+# init openvpn
+bash 'init openvpn' do
+  code <<-EOH
+    docker run -v ovpn-data-#{node['openvpn']['fqdn']}:/etc/openvpn --rm kylemanna/openvpn ovpn_genconfig -u #{node['openvpn']['fqdn']}
+    docker run -v ovpn-data-#{node['openvpn']['fqdn']}:/etc/openvpn --rm kylemanna/openvpn easyrsa init-pki
+    docker run -v ovpn-data-#{node['openvpn']['fqdn']}:/etc/openvpn --rm kylemanna/openvpn sh -c 'echo #{node['openvpn']['fqdn']} | easyrsa build-ca nopass'
+    docker run -v ovpn-data-#{node['openvpn']['fqdn']}:/etc/openvpn --rm kylemanna/openvpn easyrsa gen-dh
+    docker run -v ovpn-data-#{node['openvpn']['fqdn']}:/etc/openvpn --rm kylemanna/openvpn easyrsa build-server-full #{node['openvpn']['fqdn']} nopass
+    docker run -v ovpn-data-#{node['openvpn']['fqdn']}:/etc/openvpn --rm kylemanna/openvpn openvpn --genkey --secret /etc/openvpn/pki/ta.key
+  EOH
+  not_if { File.exist?("/var/lib/docker/volumes/ovpn-data-#{node['openvpn']['fqdn']}/_data/openvpn.conf") }
 end
 
-# www configuration
-template '/var/lib/docker/volumes/nginx-config/_data/nginx/site-confs/default' do
-  source   'volumes/nginx-config/nginx/site-confs/default.erb'
-  notifies :restart, 'service[docker-nginx]'
+# openvpn configuration
+template "/var/lib/docker/volumes/ovpn-data-#{node['openvpn']['fqdn']}/_data/openvpn.conf" do
+  source   'volumes/ovpn-data/openvpn.conf.erb'
+  variables({
+    fqdn: node['openvpn']['fqdn']
+  })
+  notifies :restart, "service[docker-openvpn@#{node['openvpn']['fqdn']}]"
+end
+
+# transmission configuration
+template '/var/lib/docker/volumes/transmission-config/_data/settings.json' do
+  source   'volumes/transmission-config/settings.json.erb'
+end
+
+#website
+directory '/var/lib/docker/volumes/nginx-config/_data' do
+  recursive true
 end
 
 git '/var/lib/docker/volumes/nginx-config/_data/www' do
@@ -138,17 +154,20 @@ execute 'dd if=/dev/urandom of=/var/lib/docker/volumes/nginx-config/_data/www/sp
   not_if { File.exist?('/var/lib/docker/volumes/nginx-config/_data/www/speedtest/payload') }
 end
 
-# transmission configuration
-template '/var/lib/docker/volumes/transmission-config/_data/settings.json' do
-  source   'volumes/transmission-config/settings.json.erb'
-  notifies :restart, 'service[docker-transmission]'
+# start containers
+['docker-nginx', "docker-openvpn@#{node['openvpn']['fqdn']}",
+ 'docker-plex', 'docker-transmission'].each do |svc|
+  service svc do
+    action [:enable, :start]
+  end
 end
 
-# openvpn configuration
-template "/var/lib/docker/volumes/ovpn-data-#{node['openvpn']['fqdn']}/_data/openvpn.conf" do
-  source   'volumes/ovpn-data/openvpn.conf.erb'
-  variables({
-    fqdn: node['openvpn']['fqdn']
-  })
-  notifies :restart, "service[docker-openvpn@#{node['openvpn']['fqdn']}]"
+# www configuration
+template '/var/lib/docker/volumes/nginx-config/_data/nginx/site-confs/default' do
+  source   'volumes/nginx-config/nginx/site-confs/default.erb'
+  notifies :restart, 'service[docker-nginx]'
+end
+
+file '/var/lib/docker/volumes/nginx-config/_data/nginx/.htpasswd' do
+  content node['nginx']['htpasswd']
 end
