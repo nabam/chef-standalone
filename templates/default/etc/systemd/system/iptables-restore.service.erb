@@ -5,7 +5,7 @@ Conflicts=shutdown.target
 
 [Service]
 Type=oneshot
-ExecStart=sh -c "ipset restore < /etc/ipset.state"
+ExecStart=/bin/sh -c "/sbin/ipset restore < /etc/ipset.state"
 ExecStart=/sbin/iptables-restore /etc/iptables.rules
 ExecStart=/sbin/ip6tables-restore /etc/ip6tables.rules
 
