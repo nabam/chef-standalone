@@ -174,6 +174,11 @@ file '/var/lib/docker/volumes/nginx-config/_data/nginx/.htpasswd' do
   content node['nginx']['htpasswd']
 end
 
+file '/var/lib/docker/volumes/nginx-config/_data/fail2ban/jail.local' do
+  content ''
+  notifies :restart, 'service[docker-nginx]'
+end
+
 # vnc
 user "vnc"
 
@@ -225,4 +230,17 @@ end
 # housekeeping
 template '/etc/cron.d/housekeeping' do
   source 'etc/cron.d/housekeeping.erb'
+end
+
+# fail2ban
+service 'fail2ban'
+
+template '/etc/fail2ban/jail.local' do
+  source 'etc/fail2ban/jail.local.erb'
+  notifies :restart, 'service[fail2ban]'
+end
+
+template '/etc/fail2ban/paths-overrides.local' do
+  source 'etc/fail2ban/paths-overrides.local'
+  notifies :restart, 'service[fail2ban]'
 end
