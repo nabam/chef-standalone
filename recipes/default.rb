@@ -220,3 +220,8 @@ end
 service 'duckietv.service' do
   action [:enable, :start]
 end
+
+# housekeeping
+template '/etc/cron.d/housekeeping' do
+  source 'etc/cron.d/housekeeping.erb'
+end
