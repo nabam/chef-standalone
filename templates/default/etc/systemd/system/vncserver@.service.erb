@@ -1,0 +1,17 @@
+[Unit]
+Description=VNC server
+After=syslog.target network.target
+
+[Service]
+RestartSec=10
+Restart=always
+Type=forking
+User=vnc
+PAMName=login
+PIDFile=/home/vnc/.vnc/%H:%i.pid
+ExecStartPre=-/usr/bin/vnc4server -kill :%i > /dev/null 2>&1
+ExecStart=/usr/bin/vnc4server -depth 16 -geometry 1360x768 :%i
+ExecStop=/usr/bin/vnc4server -kill :%i
+
+[Install]
+WantedBy=multi-user.target

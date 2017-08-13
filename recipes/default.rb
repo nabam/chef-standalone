@@ -20,8 +20,9 @@ include_recipe 'systemd::timezone'
 ['ipset', 'docker.io', 'sysdig', 'bash-completion', 'tcpdump',
  'linux-headers-generic', 'linux-image-generic', 'sysdig-dkms',
  'git', 'apache2-utils', 'htop', 'transmission-remote-cli',
- 'tcpdump', 'dnsutils', 'vim', 'silversearcher-ag', 'tree',
- 'file', 'haveged'].each do |pkg|
+ 'tcpdump', 'dnsutils', 'vim', 'silversearcher-ag', 'tree', 'cron',
+ 'file', 'haveged', 'iftop', 'vnc4server', 'fluxbox', 'xfonts-base',
+ 'libxss1', 'libnss3', 'libasound2', 'eterm'].each do |pkg|
   package pkg
 end
 
@@ -64,12 +65,12 @@ end
 
 # media
 group 'media' do
-  gid 1001
+  gid node['media']['gid']
 end
 
 user 'media' do
-  uid   1001
-  gid   1001
+  uid   node['media']['uid']
+  gid   node['media']['gid']
   home  '/home/media'
   shell '/bin/false'
 end
@@ -91,8 +92,8 @@ end
       hostname:   node['hostname'],
       url:        node['nginx']['url'],
       email:      node['nginx']['email'],
-      uid:        1001,
-      gid:        1001,
+      uid:        node['media']['uid'],
+      gid:        node['media']['gid'],
       plex_claim: node['plex']['claim']
     })
     notifies :run, 'execute[systemctl daemon-reload]'
@@ -170,4 +171,52 @@ end
 
 file '/var/lib/docker/volumes/nginx-config/_data/nginx/.htpasswd' do
   content node['nginx']['htpasswd']
+end
+
+# vnc
+user "vnc"
+
+template '/etc/systemd/system/vncserver@.service' do
+  source 'etc/systemd/system/vncserver@.service.erb'
+  notifies :run, 'execute[systemctl daemon-reload]'
+end
+
+directory '/home/vnc/.vnc' do
+  recursive true
+  owner "vnc"
+  group "vnc"
+end
+
+template "/home/vnc/.vnc/xstartup" do
+  source "vnc/xstartup.erb"
+end
+
+service 'vncserver@1010.service' do
+  action [:enable, :start]
+end
+
+file '/home/vnc/.vnc/passwd' do
+  owner "vnc"
+  group "vnc"
+  content Base64.decode64(node['vnc']['passwd'])
+end
+
+# DuckieTV
+remote_file "/root/DuckieTV-#{node['duckietv']['version']}-ubuntu-x64.deb" do
+  source "https://github.com/SchizoDuckie/DuckieTV/releases/download/#{node['duckietv']['version']}/DuckieTV-#{node['duckietv']['version']}-ubuntu-x64.deb"
+  action :create
+end
+
+dpkg_package 'duckietv' do
+  source "/root/DuckieTV-#{node['duckietv']['version']}-ubuntu-x64.deb"
+  action :install
+end
+
+template '/etc/systemd/system/duckietv.service' do
+  source 'etc/systemd/system/duckietv.service.erb'
+  notifies :run, 'execute[systemctl daemon-reload]'
+end
+
+service 'duckietv.service' do
+  action [:enable, :start]
 end

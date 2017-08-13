@@ -1,0 +1,15 @@
+[Unit]
+Description=DuckieTV
+After=vncserver@1010.service
+
+[Service]
+MemoryLimit=50M
+RestartSec=10
+Restart=always
+User=vnc
+PAMName=login
+Environment=DISPLAY=:1010
+ExecStart=/usr/bin/dbus-launch /usr/bin/DuckieTV
+
+[Install]
+WantedBy=multi-user.target
