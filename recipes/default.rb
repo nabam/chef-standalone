@@ -22,7 +22,8 @@ include_recipe 'systemd::timezone'
  'git', 'apache2-utils', 'htop', 'transmission-remote-cli',
  'tcpdump', 'dnsutils', 'vim', 'silversearcher-ag', 'tree', 'cron',
  'file', 'haveged', 'iftop', 'vnc4server', 'fluxbox', 'xfonts-base',
- 'libxss1', 'libnss3', 'libasound2', 'eterm', 'unzip'].each do |pkg|
+ 'libxss1', 'libnss3', 'libasound2', 'eterm', 'unzip', 'fail2ban'
+].each do |pkg|
   package pkg
 end
 
