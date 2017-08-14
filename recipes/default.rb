@@ -241,6 +241,6 @@ template '/etc/fail2ban/jail.local' do
 end
 
 template '/etc/fail2ban/paths-overrides.local' do
-  source 'etc/fail2ban/paths-overrides.local'
+  source 'etc/fail2ban/paths-overrides.local.erb'
   notifies :restart, 'service[fail2ban]'
 end
