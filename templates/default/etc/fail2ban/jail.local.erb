@@ -1,0 +1,14 @@
+[sshd]
+port = 22,10022
+
+[nginx-http-auth]
+chain = FORWARD
+enabled  = true
+
+[nginx-botsearch]
+chain = FORWARD
+enabled  = true
+
+[php-url-fopen]
+chain = FORWARD
+enabled  = true

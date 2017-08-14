@@ -1,0 +1,4 @@
+[DEFAULT]
+
+nginx_error_log = /var/lib/docker/volumes/nginx-config/_data/log/nginx/error.log
+nginx_access_log = /var/lib/docker/volumes/nginx-config/_data/log/nginx/access.log
