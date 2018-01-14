@@ -12,6 +12,10 @@ upstream transmission  {
   server 172.17.0.1:9091; #Transmission
 }
 
+upstream sickgear  {
+  server 172.17.0.1:8081; #Sickgear
+}
+
 server {
   listen 443 ssl default_server http2;
 
@@ -40,6 +44,13 @@ server {
     rewrite        ^/transmission/?$ /transmission/web/ redirect;
   }
 
+  location /sickgear {
+    auth_basic "Restricted";
+    auth_basic_user_file /config/nginx/.htpasswd;
+    include /config/nginx/proxy.conf;
+
+    proxy_pass   http://sickgear;
+  }
 
   location /ip {
     return 200 $remote_addr\n;

@@ -84,7 +84,7 @@ end
 
 # systemd units for containers
 ['iptables-restore.service', 'docker-nginx.service', 'docker-openvpn@.service',
- 'docker-plex.service', 'docker-transmission.service'].each do |unit|
+ 'docker-plex.service', 'docker-transmission.service', 'docker-sickgear.service'].each do |unit|
   template "/etc/systemd/system/#{unit}" do
     source "etc/systemd/system/#{unit}.erb"
     variables({
@@ -156,9 +156,25 @@ execute 'dd if=/dev/urandom of=/var/lib/docker/volumes/nginx-config/_data/www/sp
   not_if { File.exist?('/var/lib/docker/volumes/nginx-config/_data/www/speedtest/payload') }
 end
 
+# SickGear
+directory "/home/media/sickgear" do
+  owner "media"
+  group "media"
+end
+
+directory "/home/media/shows" do
+  owner "media"
+  group "media"
+end
+
+template '/home/media/sickgear/config.ini' do
+  source 'sickgear/config.ini.erb'
+  notifies :restart, 'service[docker-sickgear]'
+end
+
 # start containers
 ['docker-nginx', "docker-openvpn@#{node['openvpn']['fqdn']}",
- 'docker-plex', 'docker-transmission'].each do |svc|
+ 'docker-plex', 'docker-transmission', 'docker-sickgear'].each do |svc|
   service svc do
     action [:enable, :start]
   end
@@ -207,7 +223,7 @@ file '/home/vnc/.vnc/passwd' do
   content Base64.decode64(node['vnc']['passwd'])
 end
 
-# DuckieTV
+# DuckieTV disabled in favor of SickGear
 remote_file "/root/DuckieTV-#{node['duckietv']['version']}-ubuntu-x64.deb" do
   source "https://github.com/SchizoDuckie/DuckieTV/releases/download/#{node['duckietv']['version']}/DuckieTV-#{node['duckietv']['version']}-ubuntu-x64.deb"
   action :create
@@ -224,7 +240,7 @@ template '/etc/systemd/system/duckietv.service' do
 end
 
 service 'duckietv.service' do
-  action [:enable, :start]
+  action [:disable, :stop]
 end
 
 # housekeeping

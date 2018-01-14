@@ -11,6 +11,7 @@ COMMIT
 -A INPUT -i lo -j ACCEPT
 -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
 -A INPUT -p tcp -m tcp --dport 10022 -j ACCEPT
+-A INPUT -i docker0 -p tcp --dport 8081 -j ACCEPT
 -A INPUT -i docker0 -p tcp --dport 9091 -j ACCEPT
 -A INPUT -p icmp -j ACCEPT
 COMMIT
