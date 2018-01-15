@@ -172,6 +172,7 @@ template '/home/media/sickgear/config.ini' do
   variables({
     trakt: node['trakt']
   })
+  action [:create_if_missing]
   notifies :restart, 'service[docker-sickgear]'
 end
 
