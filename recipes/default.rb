@@ -95,7 +95,7 @@ end
       email:      node['nginx']['email'],
       uid:        node['media']['uid'],
       gid:        node['media']['gid'],
-      plex_claim: node['plex']['claim']
+      plex_claim: node['plex']['claim'],
     })
     notifies :run, 'execute[systemctl daemon-reload]'
   end
@@ -169,6 +169,9 @@ end
 
 template '/home/media/sickgear/config.ini' do
   source 'sickgear/config.ini.erb'
+  variables({
+    trakt: node['trakt']
+  })
   notifies :restart, 'service[docker-sickgear]'
 end
 

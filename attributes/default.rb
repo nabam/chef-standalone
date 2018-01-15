@@ -14,3 +14,5 @@ default['nginx'] = {
 default['plex']['claim'] = ''
 default['openvpn']['fqdn'] = 'vpn.example.com'
 default['vnc']['passwd'] = ''
+
+default['trakt']['accounts'] = ''
