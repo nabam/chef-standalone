@@ -5,9 +5,9 @@
 47 * * * * root if [ "$(df / | tail -n1 | tr -s " " | cut -f5 -d" " | cut -f1 -d\%)" -gt "80" ]; then find /home/media/downloads -mindepth 2 -mtime +14 -delete; fi
 57 * * * * root if [ "$(df / | tail -n1 | tr -s " " | cut -f5 -d" " | cut -f1 -d\%)" -gt "90" ]; then find /home/media/downloads -mindepth 2 -mtime +7 -delete; fi
 # Shows
-37 * * * * root if [ "$(df / | tail -n1 | tr -s " " | cut -f5 -d" " | cut -f1 -d\%)" -gt "70" ]; then find /home/media/shows -mindepth 2 -mtime +30 -delete; fi
-47 * * * * root if [ "$(df / | tail -n1 | tr -s " " | cut -f5 -d" " | cut -f1 -d\%)" -gt "80" ]; then find /home/media/shows -mindepth 2 -mtime +14 -delete; fi
-57 * * * * root if [ "$(df / | tail -n1 | tr -s " " | cut -f5 -d" " | cut -f1 -d\%)" -gt "90" ]; then find /home/media/shows -mindepth 2 -mtime +7 -delete; fi
+37 * * * * root if [ "$(df / | tail -n1 | tr -s " " | cut -f5 -d" " | cut -f1 -d\%)" -gt "70" ]; then find /home/media/shows -mindepth 3 -mtime +30 -delete; fi
+47 * * * * root if [ "$(df / | tail -n1 | tr -s " " | cut -f5 -d" " | cut -f1 -d\%)" -gt "80" ]; then find /home/media/shows -mindepth 3 -mtime +14 -delete; fi
+57 * * * * root if [ "$(df / | tail -n1 | tr -s " " | cut -f5 -d" " | cut -f1 -d\%)" -gt "90" ]; then find /home/media/shows -mindepth 3 -mtime +7 -delete; fi
 # Docker
 23 22 * * * root docker rm -v $(docker ps --filter status=exited -q 2>/dev/null) 2>/dev/null
 24 22 * * * root docker rmi $(docker images --filter dangling=true -q 2>/dev/null) 2>/dev/null
