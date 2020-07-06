@@ -10,6 +10,7 @@ COMMIT
 :OUTPUT ACCEPT [0:0]
 -A INPUT -i lo -j ACCEPT
 -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT
 -A INPUT -p tcp -m tcp --dport 10022 -j ACCEPT
 -A INPUT -p icmpv6 -j ACCEPT
 -A INPUT -p udp --dport 546 -d fe80::/64 -j ACCEPT

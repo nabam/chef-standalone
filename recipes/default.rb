@@ -1,7 +1,7 @@
 #
 # Cookbook:: standalone
 # Recipe:: default
-#
+
 # Copyright:: 2017, The Authors, All Rights Reserved.
 
 apt_update "update"
@@ -19,10 +19,9 @@ include_recipe 'systemd::timezone'
 # install software
 ['ipset', 'docker.io', 'sysdig', 'bash-completion', 'tcpdump',
  'linux-headers-generic', 'linux-image-generic', 'sysdig-dkms',
- 'git', 'apache2-utils', 'htop', 'transmission-remote-cli',
+ 'git', 'apache2-utils', 'htop', 'transmission-cli',
  'tcpdump', 'dnsutils', 'vim', 'silversearcher-ag', 'tree', 'cron',
- 'file', 'haveged', 'iftop', 'vnc4server', 'fluxbox', 'xfonts-base',
- 'libxss1', 'libnss3', 'libasound2', 'eterm', 'unzip', 'fail2ban'
+ 'file', 'haveged', 'iftop', 'unzip', 'fail2ban'
 ].each do |pkg|
   package pkg
 end
@@ -57,12 +56,12 @@ execute 'systemctl daemon-reload' do
 end
 
 # ssh
-service 'sshd'
-
-template '/etc/ssh/sshd_config' do
-  source   'etc/ssh/sshd_config.erb'
-  notifies :restart, 'service[sshd]'
-end
+#service 'sshd'
+#
+#template '/etc/ssh/sshd_config' do
+#  source   'etc/ssh/sshd_config.erb'
+#  notifies :restart, 'service[sshd]'
+#end
 
 # media
 group 'media' do
@@ -77,13 +76,12 @@ user 'media' do
 end
 
 # docker volumes
-['nginx-config', "ovpn-data-#{node['openvpn']['fqdn']}",
- 'plex-config', 'plex-transcode', 'transmission-config'].each do |volume|
+['nginx-config', 'plex-config', 'plex-transcode', 'transmission-config'].each do |volume|
   docker_volume volume
 end
 
 # systemd units for containers
-['iptables-restore.service', 'docker-nginx.service', 'docker-openvpn@.service',
+['iptables-restore.service', 'docker-nginx.service',
  'docker-plex.service', 'docker-transmission.service', 'docker-sickgear.service'].each do |unit|
   template "/etc/systemd/system/#{unit}" do
     source "etc/systemd/system/#{unit}.erb"
@@ -99,28 +97,6 @@ end
     })
     notifies :run, 'execute[systemctl daemon-reload]'
   end
-end
-
-# init openvpn
-bash 'init openvpn' do
-  code <<-EOH
-    docker run -v ovpn-data-#{node['openvpn']['fqdn']}:/etc/openvpn --rm kylemanna/openvpn ovpn_genconfig -u #{node['openvpn']['fqdn']}
-    docker run -v ovpn-data-#{node['openvpn']['fqdn']}:/etc/openvpn --rm kylemanna/openvpn easyrsa init-pki
-    docker run -v ovpn-data-#{node['openvpn']['fqdn']}:/etc/openvpn --rm kylemanna/openvpn sh -c 'echo #{node['openvpn']['fqdn']} | easyrsa build-ca nopass'
-    docker run -v ovpn-data-#{node['openvpn']['fqdn']}:/etc/openvpn --rm kylemanna/openvpn easyrsa gen-dh
-    docker run -v ovpn-data-#{node['openvpn']['fqdn']}:/etc/openvpn --rm kylemanna/openvpn easyrsa build-server-full #{node['openvpn']['fqdn']} nopass
-    docker run -v ovpn-data-#{node['openvpn']['fqdn']}:/etc/openvpn --rm kylemanna/openvpn openvpn --genkey --secret /etc/openvpn/pki/ta.key
-  EOH
-  not_if { File.exist?("/var/lib/docker/volumes/ovpn-data-#{node['openvpn']['fqdn']}/_data/openvpn.conf") }
-end
-
-# openvpn configuration
-template "/var/lib/docker/volumes/ovpn-data-#{node['openvpn']['fqdn']}/_data/openvpn.conf" do
-  source   'volumes/ovpn-data/openvpn.conf.erb'
-  variables({
-    fqdn: node['openvpn']['fqdn']
-  })
-  notifies :restart, "service[docker-openvpn@#{node['openvpn']['fqdn']}]"
 end
 
 # transmission configuration
@@ -143,8 +119,13 @@ directory '/var/lib/docker/volumes/nginx-config/_data/www/speedtest' do
   recursive true
 end
 
-remote_file '/var/lib/docker/volumes/nginx-config/_data/www/speedtest/speedtest_worker.min.js' do
-  source 'https://raw.githubusercontent.com/adolfintel/speedtest/master/speedtest_worker.min.js'
+remote_file '/var/lib/docker/volumes/nginx-config/_data/www/speedtest/speedtest_worker.js' do
+  source 'https://raw.githubusercontent.com/librespeed/speedtest/master/speedtest_worker.js'
+  action :create
+end
+
+remote_file '/var/lib/docker/volumes/nginx-config/_data/www/speedtest/speedtest.js' do
+  source 'https://raw.githubusercontent.com/librespeed/speedtest/master/speedtest.js'
   action :create
 end
 
@@ -172,13 +153,15 @@ template '/home/media/sickgear/config.ini' do
   variables({
     trakt: node['trakt']
   })
+  owner "media"
+  group "media"
+  mode "640"
   action [:create_if_missing]
   notifies :restart, 'service[docker-sickgear]'
 end
 
 # start containers
-['docker-nginx', "docker-openvpn@#{node['openvpn']['fqdn']}",
- 'docker-plex', 'docker-transmission', 'docker-sickgear'].each do |svc|
+['docker-nginx', 'docker-plex', 'docker-transmission', 'docker-sickgear'].each do |svc|
   service svc do
     action [:enable, :start]
   end
@@ -197,54 +180,6 @@ end
 file '/var/lib/docker/volumes/nginx-config/_data/fail2ban/jail.local' do
   content ''
   notifies :restart, 'service[docker-nginx]'
-end
-
-# vnc
-user "vnc"
-
-template '/etc/systemd/system/vncserver@.service' do
-  source 'etc/systemd/system/vncserver@.service.erb'
-  notifies :run, 'execute[systemctl daemon-reload]'
-end
-
-directory '/home/vnc/.vnc' do
-  recursive true
-  owner "vnc"
-  group "vnc"
-end
-
-template "/home/vnc/.vnc/xstartup" do
-  source "vnc/xstartup.erb"
-end
-
-service 'vncserver@1010.service' do
-  action [:enable, :start]
-end
-
-file '/home/vnc/.vnc/passwd' do
-  owner "vnc"
-  group "vnc"
-  content Base64.decode64(node['vnc']['passwd'])
-end
-
-# DuckieTV disabled in favor of SickGear
-remote_file "/root/DuckieTV-#{node['duckietv']['version']}-ubuntu-x64.deb" do
-  source "https://github.com/SchizoDuckie/DuckieTV/releases/download/#{node['duckietv']['version']}/DuckieTV-#{node['duckietv']['version']}-ubuntu-x64.deb"
-  action :create
-end
-
-dpkg_package 'duckietv' do
-  source "/root/DuckieTV-#{node['duckietv']['version']}-ubuntu-x64.deb"
-  action :install
-end
-
-template '/etc/systemd/system/duckietv.service' do
-  source 'etc/systemd/system/duckietv.service.erb'
-  notifies :run, 'execute[systemctl daemon-reload]'
-end
-
-service 'duckietv.service' do
-  action [:disable, :stop]
 end
 
 # housekeeping
